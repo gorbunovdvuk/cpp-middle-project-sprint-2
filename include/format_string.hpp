@@ -3,8 +3,6 @@
 //
 
 #pragma once
-#include <algorithm>
-
 #include "types.hpp"
 
 namespace stdx::details {

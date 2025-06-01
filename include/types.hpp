@@ -1,5 +1,7 @@
 #pragma once
-#include <filesystem>
+
+#include <ranges>
+#include <cstdint>
 
 namespace stdx::details {
 

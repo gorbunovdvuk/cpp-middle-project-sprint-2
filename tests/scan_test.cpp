@@ -1,5 +1,3 @@
-#include <gtest/gtest.h>
-
 #include "scan.hpp"
 
 using namespace stdx::details::format_string_literals;
