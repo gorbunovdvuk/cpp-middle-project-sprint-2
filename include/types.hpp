@@ -17,6 +17,26 @@ struct is_instance_of<V, V<Args...>> : std::true_type {};
 template<template<auto...> typename V, typename T>
 static constexpr bool is_instance_of_v = is_instance_of<V, T>::value;
 
+enum Specifier {
+    Unsigned,
+    Signed,
+    String,
+    Empty
+};
+
+template<char c>
+consteval Specifier char_to_specifier() {
+    if constexpr (c == 'u') {
+        return Specifier::Unsigned;
+    } else if constexpr (c == 's') {
+        return Specifier::String;
+    } else if constexpr (c == 'd') {
+        return Specifier::Signed;
+    } else {
+        static_assert(false, "Unknown specifier provided");
+    }
+}
+
 // Шаблонный класс для хранения результатов успешного сканирования
 
 template <typename... Ts>

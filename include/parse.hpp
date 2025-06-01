@@ -8,13 +8,13 @@
 
 namespace stdx::details {
 
-template<typename ElementType, char c>
+template<typename ElementType, Specifier specifier>
 consteval void check_specifier() {
     static_assert(
-        c == '\0' ||
-        (UnsignedInt<ElementType> && (c == 'u')) ||
-        (SignedInt<ElementType> && (c == 'd')) ||
-        (StringType<ElementType> && (c == 's')),
+        specifier == Specifier::Empty ||
+        (UnsignedInt<ElementType> && specifier == Specifier::Unsigned) ||
+        (SignedInt<ElementType> && specifier == Specifier::Signed) ||
+        (StringType<ElementType> && specifier == Specifier::String),
         "Specifier does not match element type"
     );
 }
@@ -75,7 +75,7 @@ consteval ElementType parse_value() {
 
 struct placeholder_source {
     size_t begin, end;
-    char specifier;
+    Specifier specifier;
 };
 
 template<size_t Is, format_string format, fixed_string string>

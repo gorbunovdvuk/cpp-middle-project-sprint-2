@@ -13,22 +13,22 @@ template<fixed_string data>
 class format_string {
     struct placeholder {
         size_t begin, end;
-        char specifier;
+        Specifier specifier;
     };
 
     template<fixed_string specifier>
-    static constexpr char get_specifier() {
+    static constexpr Specifier get_specifier() {
         static_assert(!specifier.empty(), "Empty specifier is provided");
         static_assert(specifier.front() == '{' && specifier.back() == '}', "Specifier must start with '{' and end with '}'");
         if constexpr (specifier == "{}") {
-            return '\0';
+            return Specifier::Empty;
         } else {
             constexpr auto stripped_specifier = specifier.substr(1, specifier.size() - 2);
             static_assert(
                 stripped_specifier.front() == '%' && stripped_specifier.size() == 2,
                 "Specifier must start with '%' and contain single character"
             );
-            return stripped_specifier.back();
+            return char_to_specifier<stripped_specifier.back()>();
         }
     }
 
