@@ -1,73 +1,121 @@
 #pragma once
 
 #include <expected>
-#include <string>
-#include <string_view>
 #include <utility>
-#include <vector>
 
+#include "format_string.hpp"
 #include "types.hpp"
 
 namespace stdx::details {
 
-// здесь ваш код
-
-// Функция для парсинга значения с учетом спецификатора формата
-template <typename T>
-std::expected<T, scan_error> parse_value_with_format(std::string_view input, std::string_view fmt) {
-    // здесь ваш код
+template<typename ElementType, char c>
+consteval void check_specifier() {
+    static_assert(
+        c == '\0' ||
+        (UnsignedInt<ElementType> && (c == 'u')) ||
+        (SignedInt<ElementType> && (c == 'd')) ||
+        (StringType<ElementType> && (c == 's')),
+        "Specifier does not match element type"
+    );
 }
 
-// Функция для проверки корректности входных данных и выделения из обеих строк интересующих данных для парсинга
-template <typename... Ts>
-std::expected<std::pair<std::vector<std::string_view>, std::vector<std::string_view>>, scan_error>
-parse_sources(std::string_view input, std::string_view format) {
-    std::vector<std::string_view> format_parts;  // Части формата между {}
-    std::vector<std::string_view> input_parts;
-    size_t start = 0;
-    while (true) {
-        size_t open = format.find('{', start);
-        if (open == std::string_view::npos) {
-            break;
-        }
-        size_t close = format.find('}', open);
-        if (close == std::string_view::npos) {
-            break;
-        }
+template<StringType ElementType, fixed_string view>
+consteval ElementType parse_value() {
+    return ElementType(view.begin(), view.end());
+}
 
-        // Если между предыдущей } и текущей { есть текст,
-        // проверяем его наличие во входной строке
-        if (open > start) {
-            std::string_view between = format.substr(start, open - start);
-            auto pos = input.find(between);
-            if (input.size() < between.size() || pos == std::string_view::npos) {
-                return std::unexpected(scan_error{"Unformatted text in input and format string are different"});
-            }
-            if (start != 0) {
-                input_parts.emplace_back(input.substr(0, pos));
-            }
+template<typename ElementType, fixed_string digits>
+consteval auto parse_without_sign() {
+    static_assert(!digits.empty(), "No digits provided");
+    static_assert(
+        std::all_of(digits.begin(), digits.end(), [](const char ch) { return '0' <= ch && ch <= '9'; }),
+        "Expected digits, but unknown symbol is found"
+    );
 
-            input = input.substr(pos + between.size());
-        }
-
-        // Сохраняем спецификатор формата (то, что между {})
-        format_parts.push_back(format.substr(open + 1, close - open - 1));
-        start = close + 1;
+    std::remove_cv_t<ElementType> value = 0;
+    for (const auto c : digits) {
+        value = value * 10 + (c - '0');
     }
+    return value;
+};
 
-    // Проверяем оставшийся текст после последней }
-    if (start < format.size()) {
-        std::string_view remaining_format = format.substr(start);
-        auto pos = input.find(remaining_format);
-        if (input.size() < remaining_format.size() || pos == std::string_view::npos) {
-            return std::unexpected(scan_error{"Unformatted text in input and format string are different"});
-        }
-        input_parts.emplace_back(input.substr(0, pos));
-        input = input.substr(pos + remaining_format.size());
+template<AnyInt ElementType, fixed_string string>
+consteval ElementType parse_value() {
+    if constexpr ((!SignedInt<ElementType> && string.front() != '+') ||
+        (SignedInt<ElementType> && string.front() != '+' && string.front() != '-')) {
+        return parse_without_sign<ElementType, string>();
     } else {
-        input_parts.emplace_back(input);
+        constexpr bool negative = string.front() == '-';
+        constexpr auto value = parse_without_sign<ElementType, string.substr(1, string.size() - 1)>();
+        return negative ? -value : value;
     }
-    return std::pair{format_parts, input_parts};
+}
+
+struct placeholder_source {
+    size_t begin, end;
+    char specifier;
+};
+
+template<size_t Is, format_string format, fixed_string string>
+consteval placeholder_source get_current_source_for_parsing() {
+    constexpr size_t prev_format_end = []() {
+        if constexpr (Is == 0) {
+            return 0;
+        } else {
+            return format.placeholder_positions[Is - 1].end;
+        }
+    }();
+
+    constexpr size_t prev_string_end = []() {
+        if constexpr (Is == 0) {
+            return 0;
+        } else {
+            return get_current_source_for_parsing<Is - 1, format, string>().end;
+        }
+    }();
+
+    constexpr size_t prefix_size = format.placeholder_positions[Is].begin - prev_format_end;
+    constexpr auto format_prefix = format.string.substr(prev_format_end, prefix_size);
+    constexpr auto string_prefix = string.substr(prev_string_end, prefix_size);
+    static_assert(format_prefix == string_prefix, "Prefixes do not match");
+
+    constexpr size_t next_format_start = []() {
+        if constexpr (Is + 1 == format.number_placeholders) {
+            return format.string.size();
+        } else {
+            return format.placeholder_positions[Is + 1].begin;
+        }
+    }();
+    constexpr auto suffix_size = next_format_start - format.placeholder_positions[Is].end;
+    constexpr auto string_suffix = format.string.substr(format.placeholder_positions[Is].end, suffix_size);
+
+    constexpr size_t string_start_position = prev_string_end + prefix_size;
+    constexpr size_t string_end_position = string.find(string_suffix.view(), string_start_position);
+    static_assert(string_end_position + string_suffix.size() <= string.size(), "Cound not find matching substr");
+
+    return placeholder_source{
+        .begin = string_start_position,
+        .end = string_end_position,
+        .specifier = format.placeholder_positions[Is].specifier,
+    };
+}
+
+template<size_t Is, format_string format, fixed_string string, typename ElementType>
+consteval auto parse_input() {
+    static_assert(AllowedTypes<ElementType>, "Provided type is not supported");
+
+    constexpr auto source = get_current_source_for_parsing<Is, format, string>();
+    check_specifier<ElementType, source.specifier>();
+
+    constexpr auto current_string = string.substr(source.begin, source.end - source.begin);
+    return parse_value<ElementType, current_string>();
+}
+
+template<format_string format, fixed_string string, typename ArgumentsTuple, size_t... Is>
+consteval auto parse(std::index_sequence<Is...>) {
+    return scan_result{std::make_tuple(
+        parse_input<Is, format, string, std::tuple_element_t<Is, ArgumentsTuple>>()...
+    )};
 }
 
 } // namespace stdx::details
