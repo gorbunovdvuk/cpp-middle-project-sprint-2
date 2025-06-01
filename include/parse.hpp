@@ -24,8 +24,8 @@ consteval ElementType parse_value() {
     return ElementType(view.begin(), view.end());
 }
 
-template<typename ElementType, fixed_string digits>
-consteval auto parse_without_sign() {
+template<AnyInt ElementType, fixed_string digits>
+consteval ElementType parse_without_sign() {
     static_assert(!digits.empty(), "Digits must be non-empty");
     static_assert(
         std::ranges::all_of(digits, [](const char c) { return '0' <= c && c <= '9'; }),
@@ -47,7 +47,7 @@ consteval ElementType parse_value() {
     } else {
         constexpr bool negative = string.front() == '-';
         constexpr auto value = parse_without_sign<ElementType, string.substr(1, string.size() - 1)>();
-        return negative ? -value : value;
+        return negative ? static_cast<ElementType>(-value) : value;
     }
 }
 
