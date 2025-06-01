@@ -28,7 +28,7 @@ template<typename ElementType, fixed_string digits>
 consteval auto parse_without_sign() {
     static_assert(!digits.empty(), "No digits provided");
     static_assert(
-        std::all_of(digits.begin(), digits.end(), [](const char ch) { return '0' <= ch && ch <= '9'; }),
+        std::ranges::all_of(digits, [](const char c) { return '0' <= c && c <= '9'; }),
         "Expected digits, but unknown symbol is found"
     );
 
@@ -101,7 +101,7 @@ consteval placeholder_source get_current_source_for_parsing() {
 }
 
 template<size_t Is, format_string format, fixed_string string, typename ElementType>
-consteval auto parse_input() {
+consteval ElementType parse_input() {
     static_assert(AllowedTypes<ElementType>, "Provided type is not supported");
 
     constexpr auto source = get_current_source_for_parsing<Is, format, string>();
@@ -113,7 +113,7 @@ consteval auto parse_input() {
 
 template<format_string format, fixed_string string, typename ArgumentsTuple, size_t... Is>
 consteval auto parse(std::index_sequence<Is...>) {
-    return scan_result{std::make_tuple(
+    return scan_result{ArgumentsTuple(
         parse_input<Is, format, string, std::tuple_element_t<Is, ArgumentsTuple>>()...
     )};
 }

@@ -3,10 +3,19 @@
 
 namespace stdx::details {
 
-template<auto X>
+template<auto...>
 consteval void debug() {
     static_assert(false);
 }
+
+template<template<auto...> typename V, typename T>
+struct is_instance_of : std::false_type {};
+
+template<template<auto...> typename V, auto... Args>
+struct is_instance_of<V, V<Args...>> : std::true_type {};
+
+template<template<auto...> typename V, typename T>
+static constexpr bool is_instance_of_v = is_instance_of<V, T>::value;
 
 // Шаблонный класс для хранения результатов успешного сканирования
 
@@ -41,44 +50,28 @@ struct fixed_string {
         return fixed_string(buffer.data() + start, buffer.data() + start + size);
     }
 
-    constexpr auto begin() const {
-        return buffer.data();
-    }
+    constexpr auto begin() const { return buffer.data(); }
 
-    constexpr auto end() const {
-        return buffer.data() + size();
-    }
+    constexpr auto end() const { return buffer.data() + size(); }
 
-    constexpr const char* data() const {
-        return buffer.data();
-    }
+    constexpr const char* data() const { return buffer.data(); }
 
     constexpr size_t size() const {
         return std::find(buffer.begin(), buffer.end(), '\0') - buffer.begin();
     }
 
-    constexpr bool empty() const {
-        return size() == 0;
-    }
+    constexpr bool empty() const { return size() == 0; }
 
-    constexpr char operator[](size_t index) const {
-        return buffer[index];
-    }
+    constexpr char operator[](size_t index) const { return buffer[index]; }
 
-    constexpr char front() const {
-        return buffer[0];
-    }
+    constexpr char front() const { return buffer[0]; }
 
-    constexpr char back() const {
-        return buffer[size() - 1];
-    }
+    constexpr char back() const { return buffer[size() - 1]; }
 
-    constexpr std::string_view view() const {
-        return std::string_view(buffer.data(), size());
-    }
+    constexpr std::string_view view() const { return std::string_view(buffer.data(), size()); }
 
     constexpr size_t find(std::string_view s, size_t pos = 0) const {
-        if (s.size() == 0) {
+        if (s.empty()) {
             return size();
         }
         while (pos + s.size() <= size() && substr(pos, s.size()) != s) {
@@ -117,7 +110,7 @@ concept AnyInt = SignedInt<T> || UnsignedInt<T>;
 
 template<typename T>
 concept StringType = std::is_same_v<std::remove_cv_t<T>, std::string_view> ||
-                     std::is_same_v<std::remove_cv_t<T>, fixed_string<>>;
+                     is_instance_of_v<fixed_string, std::remove_cv_t<T>>;
 
 template<typename T>
 concept AllowedTypes = SignedInt<T> || UnsignedInt<T> || StringType<T>;

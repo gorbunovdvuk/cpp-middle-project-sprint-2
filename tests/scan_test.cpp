@@ -41,7 +41,17 @@ constexpr auto test_specifiers = run_full_check<
 constexpr auto test_all_types = run_and_check_types<
     "{%u} {%u} {%u} {%u} {%d} {%d} {%d} {%d} {%s} {%s}"_fs,
     "0 0 0 0 0 0 0 0 0 0",
-    uint8_t, uint16_t, uint32_t, uint64_t, int8_t, int16_t, int32_t, int64_t, fixed_string<>, std::string_view
+    uint8_t, uint16_t, uint32_t, uint64_t,
+    int8_t, int16_t, int32_t, int64_t,
+    fixed_string<>, std::string_view
+>();
+
+constexpr auto test_const_types = run_and_check_types<
+    "{%u} {%u} {%u} {%u} {%d} {%d} {%d} {%d} {%s} {%s}"_fs,
+    "0 0 0 0 0 0 0 0 0 0",
+    const uint8_t, const uint16_t, const uint32_t, const uint64_t,
+    const int8_t, const int16_t, const int32_t, const int64_t,
+    const fixed_string<>, const std::string_view
 >();
 
 constexpr auto test_plus_integers = run_full_check<
