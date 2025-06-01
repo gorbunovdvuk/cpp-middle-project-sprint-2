@@ -26,10 +26,10 @@ consteval ElementType parse_value() {
 
 template<typename ElementType, fixed_string digits>
 consteval auto parse_without_sign() {
-    static_assert(!digits.empty(), "No digits provided");
+    static_assert(!digits.empty(), "Digits must be non-empty");
     static_assert(
         std::ranges::all_of(digits, [](const char c) { return '0' <= c && c <= '9'; }),
-        "Expected digits, but unknown symbol is found"
+        "Digits are expected, but unknown symbol is found"
     );
 
     std::remove_cv_t<ElementType> value = 0;
@@ -77,7 +77,7 @@ consteval placeholder_source get_current_source_for_parsing() {
     constexpr size_t prefix_size = format.placeholder_positions[Is].begin - prev_format_end;
     constexpr auto format_prefix = format.string.substr(prev_format_end, prefix_size);
     constexpr auto string_prefix = string.substr(prev_string_end, prefix_size);
-    static_assert(format_prefix == string_prefix, "Prefixes do not match");
+    static_assert(format_prefix == string_prefix, "Prefixes do not match in format and string");
 
     constexpr size_t next_format_start = []() {
         if constexpr (Is + 1 == format.number_placeholders) {
@@ -87,15 +87,18 @@ consteval placeholder_source get_current_source_for_parsing() {
         }
     }();
     constexpr auto suffix_size = next_format_start - format.placeholder_positions[Is].end;
-    constexpr auto string_suffix = format.string.substr(format.placeholder_positions[Is].end, suffix_size);
+    constexpr auto format_suffix = format.string.substr(format.placeholder_positions[Is].end, suffix_size);
 
-    constexpr size_t string_start_position = prev_string_end + prefix_size;
-    constexpr size_t string_end_position = string.find(string_suffix.view(), string_start_position);
-    static_assert(string_end_position + string_suffix.size() <= string.size(), "Cound not find matching substr");
+    constexpr size_t string_suffix_start_position = prev_string_end + prefix_size;
+    constexpr size_t string_suffix_end_position = string.find(format_suffix.view(), string_suffix_start_position);
+    static_assert(
+        string_suffix_end_position + format_suffix.size() <= string.size(),
+        "Cound not find matching suffix in string"
+    );
 
     return placeholder_source{
-        .begin = string_start_position,
-        .end = string_end_position,
+        .begin = string_suffix_start_position,
+        .end = string_suffix_end_position,
         .specifier = format.placeholder_positions[Is].specifier,
     };
 }

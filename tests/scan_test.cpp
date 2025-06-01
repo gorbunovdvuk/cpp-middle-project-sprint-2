@@ -11,7 +11,10 @@ template<format_string format, fixed_string string, typename... Expected>
 consteval auto run_and_check_types() {
     constexpr auto result =
         stdx::scan<format, string, Expected...>();
-    static_assert(std::is_same_v<decltype(result.values()), const std::tuple<Expected...>&>, "Types do not match");
+    static_assert(
+        std::is_same_v<decltype(result.values()), const std::tuple<Expected...>&>,
+        "Output types do not match input types"
+    );
     return result;
 }
 
@@ -19,7 +22,7 @@ template<format_string format, fixed_string string, auto... Expected>
 consteval auto run_full_check() {
     constexpr auto result = run_and_check_types<format, string, decltype(Expected)...>();
     constexpr auto expected = std::make_tuple(Expected...);
-    static_assert(result.values() == expected);
+    static_assert(result.values() == expected, "Result is incorrect");
     return result;
 }
 
