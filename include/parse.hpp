@@ -24,30 +24,52 @@ consteval ElementType parse_value() {
     return ElementType(view.begin(), view.end());
 }
 
-template<AnyInt ElementType, fixed_string digits>
+template<AnyInt ElementType, bool negative, fixed_string digits>
 consteval ElementType parse_without_sign() {
+    using IntType = std::remove_cv_t<ElementType>;
+
     static_assert(!digits.empty(), "Digits must be non-empty");
     static_assert(
         std::ranges::all_of(digits, [](const char c) { return '0' <= c && c <= '9'; }),
         "Digits are expected, but unknown symbol is found"
     );
 
-    std::remove_cv_t<ElementType> value = 0;
-    for (const auto c : digits) {
-        value = value * 10 + (c - '0');
-    }
-    return value;
+    struct ConversionResult {
+        bool overflow;
+        IntType value;
+    };
+
+    constexpr auto result = []() -> ConversionResult {
+        using UnsignedIntType = std::make_unsigned_t<IntType>;
+
+        UnsignedIntType max_value = !negative ?
+            std::numeric_limits<IntType>::max() :
+            static_cast<UnsignedIntType>(-(std::numeric_limits<IntType>::min() + 1)) + 1;
+
+        UnsignedIntType result = 0;
+        for (const char c : digits) {
+            auto digit = static_cast<UnsignedIntType>(c - '0');
+            if (result > (max_value - digit) / 10) {
+                return { true, 0 };
+            }
+            result = result * 10 + digit;
+        }
+
+        return { false, negative ? static_cast<IntType>(-result) : static_cast<IntType>(result) };
+    }();
+
+    static_assert(!result.overflow, "Overflow detected");
+    return result.value;
 };
 
 template<AnyInt ElementType, fixed_string string>
 consteval ElementType parse_value() {
     if constexpr ((!SignedInt<ElementType> && string.front() != '+') ||
         (SignedInt<ElementType> && string.front() != '+' && string.front() != '-')) {
-        return parse_without_sign<ElementType, string>();
+        return parse_without_sign<ElementType, false, string>();
     } else {
         constexpr bool negative = string.front() == '-';
-        constexpr auto value = parse_without_sign<ElementType, string.substr(1, string.size() - 1)>();
-        return negative ? static_cast<ElementType>(-value) : value;
+        return parse_without_sign<ElementType, negative, string.substr(1, string.size() - 1)>();
     }
 }
 
