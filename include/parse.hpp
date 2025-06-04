@@ -1,9 +1,11 @@
 #pragma once
 
-#include <algorithm>
-#include <numeric>
 #include "format_string.hpp"
 #include "types.hpp"
+#include <algorithm>
+#include <numeric>
+
+#include <charconv>
 
 namespace stdx::details {
 
@@ -23,53 +25,21 @@ consteval ElementType parse_value() {
     return ElementType(view.begin(), view.end());
 }
 
-template<AnyInt ElementType, bool negative, fixed_string digits>
-consteval ElementType parse_without_sign() {
-    using IntType = std::remove_cv_t<ElementType>;
-
-    static_assert(!digits.empty(), "Digits must be non-empty");
-    static_assert(
-        std::ranges::all_of(digits, [](const char c) { return '0' <= c && c <= '9'; }),
-        "Digits are expected, but unknown symbol is found"
-    );
-
-    struct ConversionResult {
-        bool overflow;
-        IntType value;
-    };
-
-    constexpr auto result = []() -> ConversionResult {
-        using UnsignedIntType = std::make_unsigned_t<IntType>;
-
-        UnsignedIntType max_value = !negative ?
-            std::numeric_limits<IntType>::max() :
-            static_cast<UnsignedIntType>(-(std::numeric_limits<IntType>::min() + 1)) + 1;
-
-        UnsignedIntType result = 0;
-        for (const char c : digits) {
-            auto digit = static_cast<UnsignedIntType>(c - '0');
-            if (result > (max_value - digit) / 10) {
-                return { true, 0 };
-            }
-            result = result * 10 + digit;
-        }
-
-        return { false, negative ? static_cast<IntType>(-result) : static_cast<IntType>(result) };
-    }();
-
-    static_assert(!result.overflow, "Overflow detected");
-    return result.value;
-};
-
 template<AnyInt ElementType, fixed_string string>
 consteval ElementType parse_value() {
-    if constexpr ((!SignedInt<ElementType> && string.front() != '+') ||
-        (SignedInt<ElementType> && string.front() != '+' && string.front() != '-')) {
-        return parse_without_sign<ElementType, false, string>();
-    } else {
-        constexpr bool negative = string.front() == '-';
-        return parse_without_sign<ElementType, negative, string.substr(1, string.size() - 1)>();
-    }
+    constexpr struct {
+        std::remove_cv_t<ElementType> value;
+        std::from_chars_result result;
+    } fc_result = []() -> decltype(fc_result) {
+        std::remove_cv_t<ElementType> value{};
+        auto result = std::from_chars(string.begin(), string.end(), value);
+        return {
+            .value = value,
+            .result = result,
+        };
+    }();
+    static_assert(fc_result.result.ptr == string.end(), "Value could not be parsed");
+    return fc_result.value;
 }
 
 struct placeholder_source {

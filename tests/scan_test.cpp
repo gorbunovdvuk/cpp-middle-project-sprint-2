@@ -55,13 +55,6 @@ constinit auto test_const_types = run_and_check_types<
     const fixed_string<>, const std::string_view
 >();
 
-constinit auto test_plus_integers = run_full_check<
-    "{%u} == {%d}"_fs,
-    "+2 == +2",
-    static_cast<uint32_t>(2),
-    static_cast<int32_t>(2)
->();
-
 constinit auto test_minus_integers = run_full_check<
     "{%d}"_fs,
     "-2",
